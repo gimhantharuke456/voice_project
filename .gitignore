@@ -1,0 +1,9 @@
+LibriSpeech/
+data/
+node_modules/
+.env
+.venv
+__pycache__/
+*.pyc
+.DS_Store
+trained/static/audio/*.wav

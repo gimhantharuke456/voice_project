@@ -1,0 +1,1 @@
+cd /Users/gimhanrajapaksha/Downloads/voice_project/trained && source .venv/bin/activate && python api.py

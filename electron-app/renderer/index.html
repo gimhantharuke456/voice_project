@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:5055 ws://localhost:5055; media-src 'self' http://localhost:5055 blob:; img-src 'self' data: http://localhost:5055; worker-src 'self';">
+  <title>ATC Voice Enhancer</title>
+  <script src="tailwind.min.js"></script>
+  <script src="socket.io.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { cyber: '#00d4ff' } } }
+    }
+  </script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[#060d1a] text-slate-100 h-screen flex flex-col overflow-hidden">
+
+  <!-- ── STARTUP SCREEN ─────────────────────────────────────── -->
+  <div id="startup-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#060d1a]">
+    <div class="text-6xl mb-6 select-none">✈️</div>
+    <h1 class="text-2xl font-bold text-white mb-1">ATC Voice Enhancer</h1>
+    <p class="text-slate-400 text-sm mb-10">Aviation Speech Enhancement System</p>
+    <div class="spinner mb-6"></div>
+    <div class="flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div>
+      <span id="startup-status" class="text-xs text-slate-500">Connecting to enhancement engine…</span>
+    </div>
+  </div>
+
+  <!-- ── APP SHELL ──────────────────────────────────────────── -->
+  <div id="app-screen" class="hidden flex flex-col h-full">
+
+    <!-- Header -->
+    <header class="drag-region flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#060d1a] flex-shrink-0">
+      <div class="flex items-center gap-3" style="padding-left: 76px;">
+        <span class="text-lg select-none">✈️</span>
+        <div>
+          <p class="text-sm font-semibold text-white leading-none">ATC Voice Enhancer</p>
+          <p class="text-[10px] text-slate-500 mt-0.5 leading-none">Aviation Speech Enhancement</p>
+        </div>
+      </div>
+      <div class="no-drag flex items-center gap-3">
+        <div class="flex items-center gap-1 p-1 rounded-full bg-[#0d1b2e] border border-white/5">
+          <button id="tab-upload-btn"
+                  class="px-3 py-1 rounded-full text-xs font-medium transition-colors bg-cyan-500/15 text-cyan-400">
+            Upload
+          </button>
+          <button id="tab-live-btn"
+                  class="px-3 py-1 rounded-full text-xs font-medium transition-colors text-slate-500 hover:text-slate-300">
+            Live
+          </button>
+        </div>
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0d1b2e] border border-white/5">
+          <div id="api-dot" class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></div>
+          <span id="api-text" class="text-xs text-slate-400">Connecting…</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main scrollable area -->
+    <main class="flex-1 overflow-y-auto">
+
+      <!-- ══════════════════════════════════════════════════════
+           MODE: UPLOAD
+      ═══════════════════════════════════════════════════════ -->
+      <div id="mode-upload" class="max-w-2xl mx-auto px-6 py-8">
+
+        <!-- ── VIEW: UPLOAD ─────────────────────────────────── -->
+        <div id="view-upload" class="fade-in">
+          <div class="text-center mb-8">
+            <h2 class="text-xl font-bold text-white mb-1">Enhance Aviation Audio</h2>
+            <p class="text-slate-400 text-sm">Remove cockpit noise, engine interference and radio static</p>
+          </div>
+          <div id="drop-zone"
+               class="no-drag relative border-2 border-dashed border-cyan-500/20 rounded-2xl p-14 text-center
+                      cursor-pointer transition-all duration-300
+                      hover:border-cyan-500/45 hover:bg-cyan-500/3 group">
+            <div class="text-5xl mb-4 transition-transform duration-300 group-hover:scale-110 select-none">🎙️</div>
+            <h3 class="text-base font-semibold text-white mb-1">Drop audio file here</h3>
+            <p class="text-slate-500 text-sm mb-5">or click to browse</p>
+            <div class="flex items-center justify-center gap-2 flex-wrap">
+              <span class="px-2.5 py-1 bg-cyan-500/10 text-cyan-400/80 rounded-full text-xs border border-cyan-500/15">WAV</span>
+              <span class="px-2.5 py-1 bg-cyan-500/10 text-cyan-400/80 rounded-full text-xs border border-cyan-500/15">MP3</span>
+              <span class="px-2.5 py-1 bg-cyan-500/10 text-cyan-400/80 rounded-full text-xs border border-cyan-500/15">FLAC</span>
+              <span class="px-2.5 py-1 bg-cyan-500/10 text-cyan-400/80 rounded-full text-xs border border-cyan-500/15">OGG</span>
+              <span class="px-2.5 py-1 bg-cyan-500/10 text-cyan-400/80 rounded-full text-xs border border-cyan-500/15">M4A</span>
+            </div>
+            <input id="file-input" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a"
+                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+          </div>
+        </div>
+
+        <!-- ── VIEW: FILE SELECTED ──────────────────────────── -->
+        <div id="view-file" class="hidden slide-up">
+          <div class="bg-[#0d1b2e] rounded-2xl border border-white/5 p-5 mb-4">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center text-lg flex-shrink-0">🎵</div>
+                <div class="min-w-0">
+                  <p id="file-name" class="text-sm font-medium text-white truncate"></p>
+                  <p id="file-meta" class="text-xs text-slate-500 mt-0.5"></p>
+                </div>
+              </div>
+              <button id="change-file-btn"
+                      class="no-drag ml-3 text-xs text-slate-600 hover:text-cyan-400 transition-colors flex-shrink-0">
+                Change
+              </button>
+            </div>
+            <div class="mb-2">
+              <p class="text-[10px] text-slate-600 uppercase tracking-widest mb-2">Original</p>
+              <audio id="original-player" controls class="no-drag"></audio>
+            </div>
+            <canvas id="original-waveform" height="72" class="hidden"></canvas>
+          </div>
+          <button id="enhance-btn"
+                  class="no-drag w-full py-4 rounded-2xl font-semibold text-sm tracking-wide
+                         bg-gradient-to-r from-cyan-500 to-blue-600 text-white
+                         hover:from-cyan-400 hover:to-blue-500
+                         active:scale-[0.98] transition-all duration-200
+                         shadow-lg shadow-cyan-500/20
+                         flex items-center justify-center gap-2">
+            <span>✨</span><span>Enhance Audio</span><span class="opacity-60">→</span>
+          </button>
+        </div>
+
+        <!-- ── VIEW: RESULTS ────────────────────────────────── -->
+        <div id="view-results" class="hidden slide-up space-y-4">
+
+          <!-- Success banner -->
+          <div class="flex items-center gap-3 p-4 rounded-2xl bg-emerald-500/8 border border-emerald-500/20">
+            <span class="text-2xl">✅</span>
+            <div>
+              <p class="text-sm font-semibold text-emerald-400">Enhancement Complete</p>
+              <p class="text-xs text-slate-500 mt-0.5">Background noise removed successfully</p>
+            </div>
+          </div>
+
+          <!-- Before / After audio cards -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-[#0d1b2e] rounded-2xl border border-white/5 p-4">
+              <div class="flex items-center gap-1.5 mb-3">
+                <div class="w-1.5 h-1.5 rounded-full bg-slate-600"></div>
+                <p class="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Original</p>
+              </div>
+              <audio id="result-original-player" controls class="no-drag mb-3"></audio>
+              <canvas id="result-original-waveform" height="56"></canvas>
+            </div>
+            <div class="bg-[#0d1b2e] rounded-2xl border border-cyan-500/20 p-4">
+              <div class="flex items-center gap-1.5 mb-3">
+                <div class="w-1.5 h-1.5 rounded-full bg-cyan-400"></div>
+                <p class="text-[10px] font-medium text-cyan-400 uppercase tracking-widest">Enhanced</p>
+              </div>
+              <audio id="enhanced-player" controls class="no-drag mb-3"></audio>
+              <canvas id="enhanced-waveform" height="56"></canvas>
+            </div>
+          </div>
+
+          <!-- ── METRICS ──────────────────────────────────────── -->
+          <div class="bg-[#0d1b2e] rounded-2xl border border-white/5 p-5">
+            <p class="text-[10px] font-medium text-slate-500 uppercase tracking-widest mb-4">Performance Metrics</p>
+
+            <!-- Header row -->
+            <div class="metrics-grid text-[10px] text-slate-600 uppercase tracking-widest mb-2 px-1">
+              <span></span>
+              <span class="text-center">Before</span>
+              <span class="text-center">After</span>
+              <span class="text-center">Improvement</span>
+            </div>
+
+            <!-- SNR -->
+            <div class="metric-row">
+              <div class="metric-label">
+                <span class="metric-name">SNR</span>
+                <span class="metric-unit">dB</span>
+              </div>
+              <div class="metric-val before" id="snr-before">—</div>
+              <div class="metric-val after"  id="snr-after">—</div>
+              <div class="metric-delta"      id="snr-delta">—</div>
+            </div>
+
+            <!-- PESQ -->
+            <div class="metric-row">
+              <div class="metric-label">
+                <span class="metric-name">PESQ</span>
+                <span class="metric-unit">1–4.5</span>
+              </div>
+              <div class="metric-val before" id="pesq-before">—</div>
+              <div class="metric-val after"  id="pesq-after">—</div>
+              <div class="metric-delta"      id="pesq-delta">—</div>
+            </div>
+
+            <!-- STOI -->
+            <div class="metric-row">
+              <div class="metric-label">
+                <span class="metric-name">STOI</span>
+                <span class="metric-unit">0–1</span>
+              </div>
+              <div class="metric-val before" id="stoi-before">—</div>
+              <div class="metric-val after"  id="stoi-after">—</div>
+              <div class="metric-delta"      id="stoi-delta">—</div>
+            </div>
+          </div>
+
+          <!-- ── ANALYSIS PLOT ─────────────────────────────────── -->
+          <div class="bg-[#0d1b2e] rounded-2xl border border-white/5 p-5">
+            <p class="text-[10px] font-medium text-slate-500 uppercase tracking-widest mb-3">Waveform & Spectrogram Analysis</p>
+            <img id="analysis-plot" src="" alt="Analysis plot"
+                 class="w-full rounded-xl hidden"
+                 style="background:#0a0f1a;">
+            <div id="plot-loading" class="flex items-center justify-center py-8 text-slate-600 text-xs gap-2">
+              <div class="spinner-xs"></div> Generating analysis…
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="grid grid-cols-2 gap-3">
+            <button id="download-btn"
+                    class="no-drag py-3 rounded-xl text-sm font-medium
+                           bg-cyan-500/10 text-cyan-400 border border-cyan-500/20
+                           hover:bg-cyan-500/20 active:scale-[0.98] transition-all duration-200
+                           flex items-center justify-center gap-2">
+              <span>↓</span> Download WAV
+            </button>
+            <button id="enhance-another-btn"
+                    class="no-drag py-3 rounded-xl text-sm font-medium
+                           bg-white/5 text-slate-300 border border-white/5
+                           hover:bg-white/10 active:scale-[0.98] transition-all duration-200
+                           flex items-center justify-center gap-2">
+              <span>+</span> Enhance Another
+            </button>
+          </div>
+
+        </div><!-- /view-results -->
+
+      </div><!-- /mode-upload -->
+
+      <!-- ══════════════════════════════════════════════════════
+           MODE: LIVE
+      ═══════════════════════════════════════════════════════ -->
+      <div id="mode-live" class="hidden max-w-2xl mx-auto px-6 py-8">
+
+        <div class="text-center mb-8">
+          <h2 class="text-xl font-bold text-white mb-1">Live Noise Cancellation</h2>
+          <p class="text-slate-400 text-sm">Real-time mic denoising via DeepFilterNet</p>
+        </div>
+
+        <div class="flex items-start gap-2 p-3 mb-5 rounded-xl bg-amber-500/8 border border-amber-500/20">
+          <span class="text-sm">🎧</span>
+          <p class="text-xs text-amber-300/90 leading-relaxed">
+            Use headphones while running Live Mode — the enhanced audio plays back through your
+            speakers in real time, and without headphones the mic can pick it back up.
+          </p>
+        </div>
+
+        <div class="bg-[#0d1b2e] rounded-2xl border border-white/5 p-5 mb-4">
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2">
+              <div id="live-dot" class="w-1.5 h-1.5 rounded-full bg-slate-600"></div>
+              <span id="live-status" class="text-xs text-slate-400">Idle</span>
+            </div>
+            <label class="no-drag flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+              <input id="record-toggle" type="checkbox" class="no-drag accent-cyan-500">
+              Record session
+            </label>
+          </div>
+
+          <div class="space-y-3 mb-5">
+            <div>
+              <div class="flex items-center justify-between text-[10px] text-slate-600 uppercase tracking-widest mb-1">
+                <span>Input</span>
+              </div>
+              <div class="level-track"><div id="level-input" class="level-fill bg-slate-500"></div></div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between text-[10px] text-cyan-500/80 uppercase tracking-widest mb-1">
+                <span>Output (denoised)</span>
+              </div>
+              <div class="level-track"><div id="level-output" class="level-fill bg-cyan-400"></div></div>
+            </div>
+          </div>
+
+          <button id="live-toggle-btn"
+                  class="no-drag w-full py-4 rounded-2xl font-semibold text-sm tracking-wide
+                         bg-gradient-to-r from-cyan-500 to-blue-600 text-white
+                         hover:from-cyan-400 hover:to-blue-500
+                         active:scale-[0.98] transition-all duration-200
+                         shadow-lg shadow-cyan-500/20
+                         flex items-center justify-center gap-2">
+            <span>🎙️</span><span id="live-toggle-label">Start Live Denoise</span>
+          </button>
+        </div>
+
+        <!-- ── LIVE METRICS ──────────────────────────────────── -->
+        <div class="bg-[#0d1b2e] rounded-2xl border border-white/5 p-5 mb-4">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Performance Metrics</p>
+            <span id="live-metrics-status" class="text-[10px] text-slate-600">Idle</span>
+          </div>
+
+          <!-- Header row -->
+          <div class="metrics-grid text-[10px] text-slate-600 uppercase tracking-widest mb-2 px-1">
+            <span></span>
+            <span class="text-center">Before</span>
+            <span class="text-center">After</span>
+            <span class="text-center">Improvement</span>
+          </div>
+
+          <!-- SNR -->
+          <div class="metric-row">
+            <div class="metric-label">
+              <span class="metric-name">SNR</span>
+              <span class="metric-unit">dB</span>
+            </div>
+            <div class="metric-val before" id="live-snr-before">—</div>
+            <div class="metric-val after"  id="live-snr-after">—</div>
+            <div class="metric-delta"      id="live-snr-delta">—</div>
+          </div>
+
+          <!-- PESQ -->
+          <div class="metric-row">
+            <div class="metric-label">
+              <span class="metric-name">PESQ</span>
+              <span class="metric-unit">1–4.5</span>
+            </div>
+            <div class="metric-val before" id="live-pesq-before">—</div>
+            <div class="metric-val after"  id="live-pesq-after">—</div>
+            <div class="metric-delta"      id="live-pesq-delta">—</div>
+          </div>
+
+          <!-- STOI -->
+          <div class="metric-row">
+            <div class="metric-label">
+              <span class="metric-name">STOI</span>
+              <span class="metric-unit">0–1</span>
+            </div>
+            <div class="metric-val before" id="live-stoi-before">—</div>
+            <div class="metric-val after"  id="live-stoi-after">—</div>
+            <div class="metric-delta"      id="live-stoi-delta">—</div>
+          </div>
+        </div>
+
+        <button id="save-recording-btn"
+                class="no-drag hidden w-full py-3 rounded-xl text-sm font-medium
+                       bg-cyan-500/10 text-cyan-400 border border-cyan-500/20
+                       hover:bg-cyan-500/20 active:scale-[0.98] transition-all duration-200
+                       flex items-center justify-center gap-2">
+          <span>↓</span> Save Recording (WAV)
+        </button>
+
+      </div><!-- /mode-live -->
+
+    </main>
+  </div>
+
+  <!-- ── LOADING OVERLAY ────────────────────────────────────── -->
+  <div id="loading-overlay"
+       class="hidden fixed inset-0 z-40 flex items-center justify-center
+              bg-[#060d1a]/85 backdrop-blur-md">
+    <div class="bg-[#0d1b2e] rounded-3xl border border-white/5 p-10 flex flex-col items-center w-72">
+      <div class="spinner-lg mb-5"></div>
+      <p class="text-white font-semibold mb-1">Processing Audio</p>
+      <p id="loading-status" class="text-slate-500 text-xs text-center mb-5">Sending to enhancement engine…</p>
+      <div class="progress-track w-full">
+        <div class="progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TOAST CONTAINER ───────────────────────────────────── -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script src="renderer.js"></script>
+  <script src="live.js"></script>
+</body>
+</html>
