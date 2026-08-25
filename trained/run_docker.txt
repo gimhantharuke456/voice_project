@@ -1,0 +1,35 @@
+# Run the ATC Voice Enhancer backend in Docker
+# Requires Docker Desktop installed (https://www.docker.com/products/docker-desktop)
+# On Windows, use WSL2 backend (Docker Desktop sets this up automatically).
+
+cd trained
+
+# 1. Build the image (run once, or again after changing requirements.txt / api.py)
+docker build -t atc-voice-backend .
+
+# 2. Run it in the foreground (see logs directly, Ctrl+C to stop)
+docker run -p 5055:5055 atc-voice-backend
+
+# --- OR run it in the background ---
+
+# 2b. Run detached, named, with auto-restart
+docker run -d -p 5055:5055 --name atc-backend --restart unless-stopped atc-voice-backend
+
+# 3. View logs (when running detached)
+docker logs -f atc-backend
+
+# 4. Stop / start / remove the container
+docker stop atc-backend
+docker start atc-backend
+docker rm -f atc-backend
+
+# 5. Rebuild after code changes
+docker stop atc-backend
+docker rm atc-backend
+docker build -t atc-voice-backend .
+docker run -d -p 5055:5055 --name atc-backend --restart unless-stopped atc-voice-backend
+
+# API will be reachable at:
+#   http://localhost:5055
+
+# Point the Electron app's backend URL at http://localhost:5055
