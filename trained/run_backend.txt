@@ -1,1 +1,17 @@
 cd /Users/gimhanrajapaksha/Downloads/voice_project/trained && source .venv/bin/activate && python api.py
+
+# Windows (PowerShell) - first time setup
+cd C:\path\to\voice_project\trained
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python api.py
+
+# Windows (PowerShell) - every time after setup
+cd C:\path\to\voice_project\trained
+.venv\Scripts\activate
+python api.py
+
+# Windows (cmd.exe) - use this activate line instead
+.venv\Scripts\activate.bat
