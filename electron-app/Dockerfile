@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
+# Run as a non-root user - Electron/Chromium and the VNC stack don't need
+# root, and this limits the blast radius if the exposed VNC/websockify
+# surface is ever compromised.
+RUN useradd -m -s /bin/bash appuser
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -18,7 +23,10 @@ RUN npm install
 COPY . .
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 ENV DISPLAY=:99
 

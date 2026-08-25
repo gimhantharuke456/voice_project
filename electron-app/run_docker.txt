@@ -12,11 +12,18 @@ docker build -t atc-electron-app .
 # 2. Run it
 #    --shm-size=1gb is important: Chromium (which Electron embeds) needs more
 #    shared memory than Docker's 64MB default, or it crashes/renders blank.
-docker run -p 6080:6080 --shm-size=1gb --name atc-electron atc-electron-app
+#
+#    -e VNC_PASSWORD=... is REQUIRED - the entrypoint refuses to start an
+#    unauthenticated remote desktop. Pick your own password below.
+#
+#    127.0.0.1:6080:6080 binds the port to this machine only (not your LAN/
+#    network) - do NOT change this to plain -p 6080:6080 unless you also
+#    put a real reverse proxy with TLS in front of it.
+docker run -p 127.0.0.1:6080:6080 --shm-size=1gb -e VNC_PASSWORD=changeme --name atc-electron atc-electron-app
 
 # 3. Open the app in your browser:
 #    http://localhost:6080/vnc.html
-#    Click "Connect" (no password set) - the Electron window will appear.
+#    Click "Connect" and enter the VNC_PASSWORD you set above.
 
 # --- Managing the container ---
 docker stop atc-electron
@@ -27,7 +34,7 @@ docker rm -f atc-electron
 docker stop atc-electron
 docker rm atc-electron
 docker build -t atc-electron-app .
-docker run -p 6080:6080 --shm-size=1gb --name atc-electron atc-electron-app
+docker run -p 127.0.0.1:6080:6080 --shm-size=1gb -e VNC_PASSWORD=changeme --name atc-electron atc-electron-app
 
 # --- IMPORTANT: connecting to the backend ---
 # preload.js hardcodes the backend URL as http://localhost:5055
