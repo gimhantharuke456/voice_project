@@ -1,0 +1,50 @@
+# Run the Electron desktop app in Docker
+#
+# Electron is a native GUI app, so a plain container has no window to show it in.
+# This image runs Electron inside a virtual display (Xvfb) with a VNC server,
+# exposed over noVNC so you view/interact with the app through a browser tab.
+
+cd electron-app
+
+# 1. Build the image
+docker build -t atc-electron-app .
+
+# 2. Run it
+#    --shm-size=1gb is important: Chromium (which Electron embeds) needs more
+#    shared memory than Docker's 64MB default, or it crashes/renders blank.
+docker run -p 6080:6080 --shm-size=1gb --name atc-electron atc-electron-app
+
+# 3. Open the app in your browser:
+#    http://localhost:6080/vnc.html
+#    Click "Connect" (no password set) - the Electron window will appear.
+
+# --- Managing the container ---
+docker stop atc-electron
+docker start atc-electron
+docker rm -f atc-electron
+
+# --- Rebuild after code changes ---
+docker stop atc-electron
+docker rm atc-electron
+docker build -t atc-electron-app .
+docker run -p 6080:6080 --shm-size=1gb --name atc-electron atc-electron-app
+
+# --- IMPORTANT: connecting to the backend ---
+# preload.js hardcodes the backend URL as http://localhost:5055
+# Inside this container, "localhost" means the container itself, NOT your
+# Windows host or the backend's container - so the app won't reach the
+# backend unless you address it correctly:
+#
+#   - If the backend runs on the Windows host (native or via
+#     "docker run -p 5055:5055 ..."), change preload.js's apiUrl to:
+#       http://host.docker.internal:5055
+#     (host.docker.internal is a special DNS name Docker Desktop provides
+#     for reaching the host machine from inside a container.)
+#
+#   - If the backend also runs in Docker, put both containers on the same
+#     docker network and use the backend container's name instead of
+#     localhost, e.g.:
+#       docker network create atc-net
+#       docker run -d --network atc-net --name atc-backend -p 5055:5055 atc-voice-backend
+#       docker run --network atc-net -p 6080:6080 --shm-size=1gb --name atc-electron atc-electron-app
+#     and set apiUrl in preload.js to: http://atc-backend:5055
