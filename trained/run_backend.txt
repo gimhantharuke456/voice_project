@@ -1,12 +1,25 @@
 cd /Users/gimhanrajapaksha/Downloads/voice_project/trained && source .venv/bin/activate && python api.py
 
+# IMPORTANT: deepfilternet's deepfilterlib dependency only ships prebuilt
+# Windows wheels for Python 3.8-3.11. If you use Python 3.12+, pip will try
+# to compile it from source and fail with "Cargo, the Rust package manager,
+# is not installed". Use Python 3.11 (or 3.8-3.10) when creating the venv.
+
 # Windows (PowerShell) - first time setup
 cd C:\path\to\voice_project\trained
-python -m venv .venv
+py -0
+REM ^ confirms Python 3.11 (or 3.8-3.10) is installed; install from
+REM   python.org if not listed
+py -3.11 -m venv .venv
 .venv\Scripts\activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 python api.py
+
+# Windows (PowerShell) - alternative if you must use Python 3.12+:
+# install Rust so deepfilterlib can compile from source
+#   winget install Rustlang.Rustup
+#   (reopen PowerShell so PATH updates, then re-run pip install)
 
 # Windows (PowerShell) - every time after setup
 cd C:\path\to\voice_project\trained
