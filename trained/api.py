@@ -60,8 +60,9 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-AUDIO_DIR = os.path.join(os.path.dirname(__file__), 'static', 'audio')
-PLOTS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'plots')
+AUDIO_DIR   = os.path.join(os.path.dirname(__file__), 'static', 'audio')
+PLOTS_DIR   = os.path.join(os.path.dirname(__file__), 'static', 'plots')
+WEBAPP_DIR  = os.path.join(os.path.dirname(__file__), 'webapp')
 os.makedirs(AUDIO_DIR, exist_ok=True)
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
@@ -104,7 +105,7 @@ def preprocess_audio(audio_bytes):
 def save_wav(samples, filename, sample_rate=SR):
     path = os.path.join(AUDIO_DIR, filename)
     sf.write(path, samples, sample_rate, format='WAV')
-    return f'http://localhost:5055/audio/{filename}'
+    return f'/audio/{filename}'
 
 
 def blind_snr(samples, sr):
@@ -211,7 +212,20 @@ def generate_analysis_plot(original_16k, enhanced_16k, session):
     plt.savefig(plot_path, dpi=150, bbox_inches='tight')
     plt.close()
 
-    return f'http://localhost:5055/plots/analysis_{session}.png'
+    return f'/plots/analysis_{session}.png'
+
+
+@app.route('/')
+def serve_webapp_index():
+    return send_from_directory(WEBAPP_DIR, 'index.html')
+
+
+@app.route('/<path:filename>')
+def serve_webapp_asset(filename):
+    # Only serves files that exist in webapp/ (index.html, renderer.js,
+    # live.js, style.css, etc.) - unmatched paths fall through to Flask's
+    # normal 404, they don't leak the rest of the filesystem.
+    return send_from_directory(WEBAPP_DIR, filename)
 
 
 @app.route('/audio/<filename>')
