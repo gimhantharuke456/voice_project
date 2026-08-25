@@ -1,8 +1,10 @@
 FROM python:3.10-slim
 
-# System deps: ffmpeg for audio I/O, libsndfile1 for soundfile
+# System deps:
+#   ffmpeg, libsndfile1 - audio I/O
+#   build-essential     - compiles pesq's Cython extension (no prebuilt wheel exists)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
+    && apt-get install -y --no-install-recommends ffmpeg libsndfile1 build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -11,11 +13,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code and trained model
-COPY api/        ./api/
-COPY step4_preprocessor.py step5_model.py ./
-COPY models/cdae_best.pth ./models/cdae_best.pth
+# Copy application code, trained model, and static assets
+COPY api.py .
+COPY model.pth .
+COPY static/ ./static/
 
-EXPOSE 5000
+EXPOSE 5055
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "api.app:app"]
+CMD ["python", "api.py"]
